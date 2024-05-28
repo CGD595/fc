@@ -13,33 +13,41 @@ app = Flask(__name__)
 # Configurations
 UPLOAD_FOLDER = 'static/uploads/'
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
-MAX_IMAGE_SIZE = (64, 64)  # Resize images to 800x800 to reduce memory usage
+MAX_IMAGE_SIZE = (64, 64)
 
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
-# Ensure the upload folder exists
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
 
-# Load the pre-trained model
 try:
     model = joblib.load('svm_flower_classifier.pkl')
 except Exception as e:
     logging.error(f"Error loading model: {e}")
     model = None
 
-# Initialize img2vec
 try:
     img2vec = Img2Vec(model='resnet-18')
 except Exception as e:
     logging.error(f"Error initializing Img2Vec: {e}")
     img2vec = None
 
+def process_image(file):
+    try:
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], secure_filename(file.filename))
+        file.save(filepath)
+        
+        image = Image.open(filepath)
+        image = image.resize(MAX_IMAGE_SIZE)
+        return np.array(image), filepath
+    except Exception as e:
+        logging.error(f"Error processing image: {e}")
+        return None, None
+
 def extract_features(image):
     try:
-        # Convert to PIL Image and extract features
         image_pil = Image.fromarray(image)
-        features = img2vec.get_vec(image_pil)
+        features = img2vec.get_vec(image_pil, tensor=False)
         return features
     except Exception as e:
         logging.error(f"Error extracting features: {e}")
@@ -64,17 +72,8 @@ def predict():
         return redirect(request.url)
     
     if file and allowed_file(file.filename):
-        filename = secure_filename(file.filename)
-        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        file.save(filepath)
-        
-        # Read the saved file
-        image = cv2.imread(filepath)
+        image, filepath = process_image(file)
         if image is not None:
-            # Resize image to reduce memory usage
-            image = cv2.resize(image, MAX_IMAGE_SIZE)
-            
-            # Extract features and predict
             features = extract_features(image)
             if features is not None:
                 features = features.reshape(1, -1)
@@ -82,7 +81,7 @@ def predict():
                     prediction = model.predict(features)
                     return redirect(url_for('output', value=int(prediction[0]), image_path=filepath))
                 except Exception as e:
-                    logging.error(f"The Error making prediction: {e}")
+                    logging.error(f"Error making prediction: {e}")
                     return redirect(url_for('index'))
         else:
             logging.error("Error reading the image")
@@ -96,4 +95,4 @@ def output():
     return render_template('output.html', value=value, image_path=image_path)
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=False)
