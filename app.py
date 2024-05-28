@@ -13,7 +13,7 @@ app = Flask(__name__)
 # Configurations
 UPLOAD_FOLDER = 'static/uploads/'
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
-MAX_IMAGE_SIZE = (400, 400)  # Resize images to 800x800 to reduce memory usage
+MAX_IMAGE_SIZE = (64, 64)  # Resize images to 800x800 to reduce memory usage
 
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
